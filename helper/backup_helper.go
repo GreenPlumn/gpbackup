@@ -42,9 +42,12 @@ func doBackupAgent() error {
 			return errors.New("Terminated due to user request")
 		}
 		if i < len(oidList)-1 {
-			log(fmt.Sprintf("Creating pipe for oid %d\n", oidList[i+1]))
 			nextPipe = fmt.Sprintf("%s_%d", *pipeFile, oidList[i+1])
-			err := createPipe(nextPipe)
+		}
+		if i < len(oidList)-*jobs {
+			log(fmt.Sprintf("Creating pipe for oid %d\n", oidList[i+*jobs]))
+			nextPipeToCreate := fmt.Sprintf("%s_%d", *pipeFile, oidList[i+*jobs])
+			err := createPipe(nextPipeToCreate)
 			if err != nil {
 				return err
 			}

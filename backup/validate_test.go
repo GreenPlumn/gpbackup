@@ -266,7 +266,7 @@ var _ = Describe("backup/validate tests", func() {
 			 * Below are various different jobs combinations
 			 */
 			Entry("jobs combos", "--jobs 2 --metadata-only", false),
-			Entry("jobs combos", "--jobs 2 --single-data-file", false),
+			Entry("jobs combos", "--jobs 2 --single-data-file", true),
 			Entry("jobs combos", "--jobs 2 --plugin-config /tmp/file", true),
 			Entry("jobs combos", "--jobs 2 --data-only", true),
 		)

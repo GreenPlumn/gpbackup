@@ -7,13 +7,13 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"syscall"
-	"path/filepath"
 
 	"golang.org/x/sys/unix"
 
@@ -55,6 +55,7 @@ var (
 	restoreAgent     *bool
 	tocFile          *string
 	isFiltered       *bool
+	jobs             *int
 )
 
 func DoHelper() {
@@ -112,12 +113,12 @@ func InitializeGlobals() {
 	restoreAgent = flag.Bool("restore-agent", false, "Use gpbackup_helper as an agent for restore")
 	tocFile = flag.String("toc-file", "", "Absolute path to the table of contents file")
 	isFiltered = flag.Bool("with-filters", false, "Used with table/schema filters")
+	jobs = flag.Int("jobs", -1, "used to know how many COPIES are being queued up")
 
 	if *onErrorContinue && !*restoreAgent {
 		fmt.Printf("--on-error-continue flag can only be used with --restore-agent flag")
 		os.Exit(1)
 	}
-
 	flag.Parse()
 	if *printVersion {
 		fmt.Printf("gpbackup_helper version %s\n", version)

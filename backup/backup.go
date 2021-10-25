@@ -3,6 +3,7 @@ package backup
 import (
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	path "path/filepath"
 	"runtime/debug"
@@ -270,14 +271,18 @@ func backupData(tables []Table) {
 			}
 		}
 		utils.WriteOidListToSegments(oidList, globalCluster, globalFPInfo)
-		utils.CreateFirstSegmentPipeOnAllHosts(oidList[0], globalCluster, globalFPInfo)
+
+		maxPipes = int(math.Min(float64(connectionPool.NumConns), float64(len(tables))))
+		for i := 0; i < maxPipes; i++ {
+			utils.CreateSegmentPipeOnAllHosts(oidList[i], globalCluster, globalFPInfo)
+		}
 		compressStr := fmt.Sprintf(" --compression-level %d --compression-type %s", MustGetFlagInt(options.COMPRESSION_LEVEL), MustGetFlagString(options.COMPRESSION_TYPE))
 		if MustGetFlagBool(options.NO_COMPRESSION) {
 			compressStr = " --compression-level 0"
 		}
 		// Do not pass through the --on-error-continue flag because it does not apply to gpbackup
 		utils.StartGpbackupHelpers(globalCluster, globalFPInfo, "--backup-agent",
-			MustGetFlagString(options.PLUGIN_CONFIG), compressStr, false, false, &wasTerminated)
+			MustGetFlagString(options.PLUGIN_CONFIG), compressStr, false, false, &wasTerminated, MustGetFlagInt(options.JOBS))
 	}
 	gplog.Info("Writing data to file")
 	rowsCopiedMaps := backupDataForAllTables(tables)
