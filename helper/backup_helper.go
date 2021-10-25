@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/greenplum-db/gpbackup/toc"
@@ -62,11 +63,15 @@ func doBackupAgent() error {
 		channelSlice[i] = c
 	}
 	go func() {
-		reader, readHandle, err := getBackupPipeReader(fmt.Sprintf("%s_%d", *pipeFile, oidList[0]))
+		openPipeStart := time.Now()
+		readHandle, err := os.OpenFile(fmt.Sprintf("%s_%d", *pipeFile, oidList[0]), os.O_RDONLY, os.ModeNamedPipe)
+		atomic.AddUint64(&openPipeTime, uint64(time.Since(openPipeStart)/time.Microsecond))
+		log(fmt.Sprintf("ADDING TIME=ASDF=%d=%#v===========================\n", openPipeTime, openPipeTime))
+
 		if err != nil {
-			// return err
-			panic("1=====================")
+			panic(err)
 		}
+		reader := bufio.NewReader(readHandle)
 		readerSlice[0] = reader
 		readHandleSlice[0] = readHandle
 		channelSlice[0] <- true
@@ -83,11 +88,16 @@ func doBackupAgent() error {
 					// return err
 					panic("2================")
 				}
-				reader, readHandle, err := getBackupPipeReader(pipe)
+
+				openPipeStart := time.Now()
+				readHandle, err := os.OpenFile(fmt.Sprintf("%s_%d", *pipeFile, oid), os.O_RDONLY, os.ModeNamedPipe)
+				atomic.AddUint64(&openPipeTime, uint64(time.Since(openPipeStart)/time.Millisecond))
+
 				if err != nil {
-					// return err
-					panic("3===============================")
+					panic(err)
 				}
+				reader := bufio.NewReader(readHandle)
+
 				readerSlice[i+1] = reader
 				readHandleSlice[i+1] = readHandle
 				channelSlice[i+1] <- true
@@ -125,6 +135,7 @@ func doBackupAgent() error {
 		channelStart := time.Now()
 
 		<-channelSlice[i] // block until pipe is open
+		// block until next 5 pipes exist
 
 		timeBlocked := time.Since(channelStart)
 		log(fmt.Sprintf("time spent blocked on table %d: %v", i, timeBlocked))
@@ -190,7 +201,8 @@ func doBackupAgent() error {
 	log(fmt.Sprintf("loopFrontTime %v", loopFrontTime))
 	// log(fmt.Sprintf("loop aTime %v", aTime))
 	// log(fmt.Sprintf("loop bTime %v", bTime))
-	log(fmt.Sprintf("loop aaTime %v", aaTime))
+	log(fmt.Sprintf("loop openPipeTime %vms", openPipeTime))
+	log(fmt.Sprintf("Average Pipe open Time: %vms", openPipeTime/uint64(len(oidList))))
 	log(fmt.Sprintf("loop bbTime %v", bbTime))
 	log(fmt.Sprintf("loop channelBlockTime %v", channelBlockTime))
 	log(fmt.Sprintf("ioCopyTime %v", ioCopyTime))
@@ -201,27 +213,30 @@ func doBackupAgent() error {
 	return nil
 }
 
-var aaTime time.Duration
+var openPipeTime uint64
 var bbTime time.Duration
 
-func getBackupPipeReader(currentPipe string) (io.Reader, io.ReadCloser, error) {
-	aaStart := time.Now()
+// func getBackupPipeReader(currentPipe string) (io.Reader, io.ReadCloser, error) {
+// 	openPipeStart := time.Now()
 
-	readHandle, err := os.OpenFile(currentPipe, os.O_RDONLY, os.ModeNamedPipe)
-	if err != nil {
-		return nil, nil, err
-	}
+// 	readHandle, err := os.OpenFile(currentPipe, os.O_RDONLY, os.ModeNamedPipe)
+// 	if err != nil {
+// 		return nil, nil, err
+// 	}
+// 	reader := bufio.NewReader(readHandle)
 
-	aaTime += time.Since(aaStart)
-	bbStart := time.Now()
+// 	openPipeTime = uint64(time.Since(openPipeStart) / time.Millisecond)
+// 	atomic.AddUint64(&openPipeTime, openPipeTime)
 
-	// This is a workaround for https://github.com/golang/go/issues/24164.
-	// Once this bug is fixed, the call to Fd() can be removed
-	// readHandle.Fd()
-	reader := bufio.NewReader(readHandle)
-	bbTime += time.Since(bbStart)
-	return reader, readHandle, nil
-}
+// 	bbStart := time.Now()
+
+// 	// This is a workaround for https://github.com/golang/go/issues/24164.
+// 	// Once this bug is fixed, the call to Fd() can be removed
+// 	// readHandle.Fd()
+// 	reader := bufio.NewReader(readHandle)
+// 	bbTime += time.Since(bbStart)
+// 	return reader, readHandle, nil
+// }
 
 func getBackupPipeWriter() (pipe BackupPipeWriterCloser, writeCmd *exec.Cmd, err error) {
 	var writeHandle io.WriteCloser

@@ -253,6 +253,7 @@ func backupDataForAllTables(tables []Table) []map[uint32]int64 {
 	printDataBackupWarnings(numExtOrForeignTables)
 	fmt.Println("table", tableTime)
 	fmt.Println("copy", copyTime)
+	fmt.Println("exec", execTime)
 	return rowsCopiedMaps
 }
 
