@@ -100,7 +100,7 @@ func restoreDataFromTimestamp(fpInfo filepath.FilePathInfo, dataEntries []toc.Ma
 		}
 		utils.WriteOidListToSegments(filteredOids, globalCluster, fpInfo)
 		firstOid := fmt.Sprintf("%d", dataEntries[0].Oid)
-		utils.CreateFirstSegmentPipeOnAllHosts(firstOid, globalCluster, fpInfo)
+		utils.CreateSegmentPipeOnAllHosts(firstOid, globalCluster, fpInfo)
 		if wasTerminated {
 			return 0
 		}

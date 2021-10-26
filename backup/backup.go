@@ -272,7 +272,7 @@ func backupData(tables []Table) {
 		}
 		utils.WriteOidListToSegments(oidList, globalCluster, globalFPInfo)
 
-		maxPipes = int(math.Min(float64(connectionPool.NumConns), float64(len(tables))))
+		maxPipes := int(math.Min(float64(connectionPool.NumConns), float64(len(tables))))
 		for i := 0; i < maxPipes; i++ {
 			utils.CreateSegmentPipeOnAllHosts(oidList[i], globalCluster, globalFPInfo)
 		}
