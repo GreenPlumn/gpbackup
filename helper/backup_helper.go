@@ -44,9 +44,9 @@ func doBackupAgent() error {
 		if i < len(oidList)-1 {
 			nextPipe = fmt.Sprintf("%s_%d", *pipeFile, oidList[i+1])
 		}
-		if i < len(oidList)-*jobs {
-			log(fmt.Sprintf("Creating pipe for oid %d\n", oidList[i+*jobs]))
-			nextPipeToCreate := fmt.Sprintf("%s_%d", *pipeFile, oidList[i+*jobs])
+		if i < len(oidList)-*copyPrefetch {
+			log(fmt.Sprintf("Creating pipe for oid %d\n", oidList[i+*copyPrefetch]))
+			nextPipeToCreate := fmt.Sprintf("%s_%d", *pipeFile, oidList[i+*copyPrefetch])
 			err := createPipe(nextPipeToCreate)
 			if err != nil {
 				return err

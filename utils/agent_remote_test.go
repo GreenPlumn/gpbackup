@@ -131,13 +131,13 @@ var _ = Describe("agent remote", func() {
 			cc := testExecutor.ClusterCommands[0]
 			Expect(cc[1].CommandString).To(ContainSubstring(" --on-error-continue"))
 		})
-		It("Passes --jobs value to gpbackup_helper", func() {
+		It("Passes --copy-prefetch value to gpbackup_helper", func() {
 			wasTerminated := false
-			utils.StartGpbackupHelpers(testCluster, fpInfo, "operation", "/tmp/pluginConfigFile.yml", " compressStr", true, false, &wasTerminated, 100)
+			utils.StartGpbackupHelpers(testCluster, fpInfo, "operation", "/tmp/pluginConfigFile.yml", " compressStr", true, false, &wasTerminated, 4)
 
 			cc := testExecutor.ClusterCommands[0]
 			Expect(cc[1].CommandString).To(ContainSubstring(" --on-error-continue"))
-			Expect(cc[1].CommandString).To(ContainSubstring(" --jobs 100"))
+			Expect(cc[1].CommandString).To(ContainSubstring(" --copy-prefetch 4"))
 		})
 	})
 	Describe("CheckAgentErrorsOnSegments", func() {

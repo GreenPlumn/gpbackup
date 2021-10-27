@@ -282,7 +282,7 @@ func backupData(tables []Table) {
 		}
 		// Do not pass through the --on-error-continue flag because it does not apply to gpbackup
 		utils.StartGpbackupHelpers(globalCluster, globalFPInfo, "--backup-agent",
-			MustGetFlagString(options.PLUGIN_CONFIG), compressStr, false, false, &wasTerminated, MustGetFlagInt(options.JOBS))
+			MustGetFlagString(options.PLUGIN_CONFIG), compressStr, false, false, &wasTerminated, MustGetFlagInt(options.SINGLE_DATA_FILE_COPY_PREFETCH))
 	}
 	gplog.Info("Writing data to file")
 	rowsCopiedMaps := backupDataForAllTables(tables)

@@ -55,7 +55,7 @@ var (
 	restoreAgent     *bool
 	tocFile          *string
 	isFiltered       *bool
-	jobs             *int
+	copyPrefetch     *int
 )
 
 func DoHelper() {
@@ -113,7 +113,7 @@ func InitializeGlobals() {
 	restoreAgent = flag.Bool("restore-agent", false, "Use gpbackup_helper as an agent for restore")
 	tocFile = flag.String("toc-file", "", "Absolute path to the table of contents file")
 	isFiltered = flag.Bool("with-filters", false, "Used with table/schema filters")
-	jobs = flag.Int("jobs", -1, "used to know how many COPIES are being queued up")
+	copyPrefetch = flag.Int("copy-prefetch", 1, "Used to know how many COPIES are being queued up")
 
 	if *onErrorContinue && !*restoreAgent {
 		fmt.Printf("--on-error-continue flag can only be used with --restore-agent flag")
