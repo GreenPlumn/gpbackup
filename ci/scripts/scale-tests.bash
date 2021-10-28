@@ -17,7 +17,9 @@ source env.sh
 
 # Double the vmem protect limit default on the master segment to
 # prevent query cancels on large table creations (e.g. scale_db1.sql)
+# Increase max locks per transaction to prevent out of shared memory in database with many tables (100k+)
 gpconfig -c gp_vmem_protect_limit -v 16384 --masteronly
+gpconfig -c max_locks_per_transaction -v 512
 gpstop -air
 
 # only install if not installed already
@@ -32,6 +34,28 @@ set -e
 
 ### Data scale tests ###
 log_file=/tmp/gpbackup.log
+
+echo "## Populating database for copy prefetch test ##"
+createdb copyprefetchdb
+for j in {1..20000}
+do
+  psql -d copyprefetchdb -q -c "CREATE TABLE tbl_1k_\$j(i int) DISTRIBUTED BY (i);"
+  psql -d copyprefetchdb -q -c "INSERT INTO tbl_1k_\$j SELECT generate_series(1,1000)"
+done
+
+echo "## Performing single-data-file, --no-compression, --single-data-file-copy-prefetch 1 backup for copy prefetch test ##"
+time gpbackup --dbname copyprefetchdb --backup-dir /data/gpdata/ --single-data-file --no-compression --single-data-file-copy-prefetch=1 | tee "\$log_file"
+timestamp=\$(head -10 "\$log_file" | grep "Backup Timestamp " | grep -Eo "[[:digit:]]{14}")
+gpbackup_manager display-report \$timestamp
+echo "## Performing single-data-file, --no-compression, --single-data-file-copy-prefetch 4 backup for copy prefetch test ##"
+time gpbackup --dbname copyprefetchdb --backup-dir /data/gpdata/ --single-data-file --no-compression --single-data-file-copy-prefetch=4 | tee "\$log_file"
+timestamp=\$(head -10 "\$log_file" | grep "Backup Timestamp " | grep -Eo "[[:digit:]]{14}")
+gpbackup_manager display-report \$timestamp
+echo "## Performing single-data-file, --no-compression, --single-data-file-copy-prefetch 8 backup for copy prefetch test ##"
+time gpbackup --dbname copyprefetchdb --backup-dir /data/gpdata/ --single-data-file --no-compression --single-data-file-copy-prefetch=8 | tee "\$log_file"
+timestamp=\$(head -10 "\$log_file" | grep "Backup Timestamp " | grep -Eo "[[:digit:]]{14}")
+gpbackup_manager display-report \$timestamp
+
 echo "## Populating database for data scale test ##"
 createdb datascaledb
 for j in {1..5000}
@@ -54,28 +78,6 @@ echo "## Performing single-data-file and --no-compression backup for data scale 
 ### Single data file test ###
 time gpbackup --dbname datascaledb --backup-dir /data/gpdata/ --single-data-file --no-compression | tee "\$log_file"
 timestamp=\$(head -10 "\$log_file" | grep "Backup Timestamp " | grep -Eo "[[:digit:]]{14}")
-dropdb datascaledb
-echo "## Performing single-data-file restore for data scale test ##"
-time gprestore --timestamp "\$timestamp" --backup-dir /data/gpdata/  --create-db --quiet
-rm "\$log_file"
-
-echo "## Performing single-data-file, --no-compression, jobs 4 backup for data scale test ##"
-### Single data file test ###
-time gpbackup --dbname datascaledb --backup-dir /data/gpdata/ --single-data-file --no-compression --jobs=4 | tee "\$log_file"
-timestamp=\$(head -10 "\$log_file" | grep "Backup Timestamp " | grep -Eo "[[:digit:]]{14}")
-dropdb datascaledb
-echo "## Performing single-data-file restore for data scale test ##"
-time gprestore --timestamp "\$timestamp" --backup-dir /data/gpdata/  --create-db --quiet
-rm "\$log_file"
-
-echo "## Performing single-data-file, --no-compression, jobs 8 backup for data scale test ##"
-### Single data file test ###
-time gpbackup --dbname datascaledb --backup-dir /data/gpdata/ --single-data-file --no-compression --jobs=8 | tee "\$log_file"
-timestamp=\$(head -10 "\$log_file" | grep "Backup Timestamp " | grep -Eo "[[:digit:]]{14}")
-dropdb datascaledb
-echo "## Performing single-data-file restore for data scale test ##"
-time gprestore --timestamp "\$timestamp" --backup-dir /data/gpdata/  --create-db --quiet
-rm "\$log_file"
 
 echo "## Performing backup for data scale test ##"
 ### Multiple data file test ###
