@@ -107,8 +107,11 @@ func doRestoreAgent() error {
 		currentPipe = fmt.Sprintf("%s_%d", *pipeFile, oidList[i])
 		if i < len(oidList)-1 {
 			nextPipe = fmt.Sprintf("%s_%d", *pipeFile, oidList[i+1])
-			log(fmt.Sprintf("Creating pipe for oid %d: %s", oidList[i+1], nextPipe))
-			err := createPipe(nextPipe)
+		}
+		if i < len(oidList)-*copyPrefetch {
+			log(fmt.Sprintf("Creating pipe for oid %d\n", oidList[i+*copyPrefetch]))
+			nextPipeToCreate := fmt.Sprintf("%s_%d", *pipeFile, oidList[i+*copyPrefetch])
+			err := createPipe(nextPipeToCreate)
 			if err != nil {
 				// In the case this error is hit it means we have lost the
 				// ability to create pipes normally, so hard quit even if

@@ -6,6 +6,7 @@ package restore
 
 import (
 	"fmt"
+	"math"
 	"sync"
 	"sync/atomic"
 
@@ -94,13 +95,16 @@ func restoreDataFromTimestamp(fpInfo filepath.FilePathInfo, dataEntries []toc.Ma
 	if backupConfig.SingleDataFile {
 		gplog.Verbose("Initializing pipes and gpbackup_helper on segments for single data file restore")
 		utils.VerifyHelperVersionOnSegments(version, globalCluster)
-		filteredOids := make([]string, totalTables)
+		oidList := make([]string, totalTables)
 		for i, entry := range dataEntries {
-			filteredOids[i] = fmt.Sprintf("%d", entry.Oid)
+			oidList[i] = fmt.Sprintf("%d", entry.Oid)
 		}
-		utils.WriteOidListToSegments(filteredOids, globalCluster, fpInfo)
-		firstOid := fmt.Sprintf("%d", dataEntries[0].Oid)
-		utils.CreateSegmentPipeOnAllHosts(firstOid, globalCluster, fpInfo)
+		utils.WriteOidListToSegments(oidList, globalCluster, fpInfo)
+
+		maxPipes := int(math.Min(float64(connectionPool.NumConns), float64(len(oidList))))
+		for i := 0; i < maxPipes; i++ {
+			utils.CreateSegmentPipeOnAllHosts(oidList[i], globalCluster, globalFPInfo)
+		}
 		if wasTerminated {
 			return 0
 		}
@@ -108,7 +112,7 @@ func restoreDataFromTimestamp(fpInfo filepath.FilePathInfo, dataEntries []toc.Ma
 		if len(opts.IncludedRelations) > 0 || len(opts.ExcludedRelations) > 0 || len(opts.IncludedSchemas) > 0 || len(opts.ExcludedSchemas) > 0 {
 			isFilter = true
 		}
-		utils.StartGpbackupHelpers(globalCluster, fpInfo, "--restore-agent", MustGetFlagString(options.PLUGIN_CONFIG), "", MustGetFlagBool(options.ON_ERROR_CONTINUE), isFilter, &wasTerminated, MustGetFlagInt(options.JOBS))
+		utils.StartGpbackupHelpers(globalCluster, fpInfo, "--restore-agent", MustGetFlagString(options.PLUGIN_CONFIG), "", MustGetFlagBool(options.ON_ERROR_CONTINUE), isFilter, &wasTerminated, MustGetFlagInt(options.SINGLE_DATA_FILE_COPY_PREFETCH))
 	}
 	/*
 	 * We break when an interrupt is received and rely on
@@ -145,9 +149,13 @@ func restoreDataFromTimestamp(fpInfo filepath.FilePathInfo, dataEntries []toc.Ma
 					err = restoreSingleTableData(&fpInfo, entry, tableName, whichConn)
 
 					atomic.AddInt64(&tableNum, 1)
+					// Take a copy of tableNum immediately after incrementing
+					// to reduce the chance of a double increment before the
+					// value is printed to the log.
+					tablesRestored := tableNum
 					if gplog.GetVerbosity() > gplog.LOGINFO {
 						// No progress bar at this log level, so we note table count here
-						gplog.Verbose("Restored data to table %s from file (table %d of %d)", tableName, tableNum, totalTables)
+						gplog.Verbose("Restored data to table %s from file (table %d of %d)", tableName, tablesRestored, totalTables)
 					} else {
 						gplog.Verbose("Restored data to table %s from file", tableName)
 					}

@@ -106,6 +106,7 @@ func SetRestoreFlagDefaults(flagSet *pflag.FlagSet) {
 	flagSet.Bool(QUIET, false, "Suppress non-warning, non-error log messages")
 	flagSet.String(REDIRECT_DB, "", "Restore to the specified database instead of the database that was backed up")
 	flagSet.String(REDIRECT_SCHEMA, "", "Restore to the specified schema instead of the schema that was backed up")
+	flagSet.Int(SINGLE_DATA_FILE_COPY_PREFETCH, 1, "[BETA] Number of COPY commands to prefetch. May improve restore times when dataset contains many small tables")
 	flagSet.Bool(WITH_GLOBALS, false, "Restore global metadata")
 	flagSet.String(TIMESTAMP, "", "The timestamp to be restored, in the format YYYYMMDDHHMMSS")
 	flagSet.Bool(TRUNCATE_TABLE, false, "Removes data of the tables getting restored")
