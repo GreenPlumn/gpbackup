@@ -103,7 +103,7 @@ func restoreDataFromTimestamp(fpInfo filepath.FilePathInfo, dataEntries []toc.Ma
 
 		maxPipes := int(math.Min(float64(connectionPool.NumConns), float64(len(oidList))))
 		for i := 0; i < maxPipes; i++ {
-			utils.CreateSegmentPipeOnAllHosts(oidList[i], globalCluster, globalFPInfo)
+			utils.CreateSegmentPipeOnAllHosts(oidList[i], globalCluster, fpInfo)
 		}
 		if wasTerminated {
 			return 0

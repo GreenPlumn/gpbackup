@@ -66,7 +66,7 @@ integration : $(GINKGO)
 test : build unit integration
 
 end_to_end : $(GINKGO)
-		$(GO_ENV) ginkgo $(GINKGO_FLAGS) -slowSpecThreshold=10 end_to_end -- --custom_backup_dir $(CUSTOM_BACKUP_DIR) 2>&1
+		$(GO_ENV) ginkgo -v $(GINKGO_FLAGS) -slowSpecThreshold=10 end_to_end -- --custom_backup_dir $(CUSTOM_BACKUP_DIR) 2>&1
 
 coverage :
 		@./show_coverage.sh
