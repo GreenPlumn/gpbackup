@@ -31,18 +31,18 @@ func doBackupAgent() error {
 		return err
 	}
 
-	currentPipe = fmt.Sprintf("%s_%d", *pipeFile, oidList[0])
+	preloadCreatedPipes(oidList, *copyPrefetch)
+
+	var currentPipe string
 	/*
 	 * It is important that we create the reader before creating the writer
 	 * so that we establish a connection to the first pipe (created by gpbackup)
 	 * and properly clean it up if an error occurs while creating the writer.
 	 */
 	for i, oid := range oidList {
+		currentPipe = fmt.Sprintf("%s_%d", *pipeFile, oidList[i])
 		if wasTerminated {
 			return errors.New("Terminated due to user request")
-		}
-		if i < len(oidList)-1 {
-			nextPipe = fmt.Sprintf("%s_%d", *pipeFile, oidList[i+1])
 		}
 		if i < len(oidList)-*copyPrefetch {
 			log(fmt.Sprintf("Creating pipe for oid %d\n", oidList[i+*copyPrefetch]))
@@ -76,13 +76,8 @@ func doBackupAgent() error {
 		tocfile.AddSegmentDataEntry(uint(oid), lastRead, lastProcessed)
 		lastRead = lastProcessed
 
-		lastPipe = currentPipe
-		currentPipe = nextPipe
 		_ = readHandle.Close()
-		err = utils.RemoveFileIfExists(lastPipe)
-		if err != nil {
-			return err
-		}
+		deletePipe(currentPipe)
 	}
 
 	_ = pipeWriter.Close()

@@ -3,7 +3,6 @@ package end_to_end_test
 import (
 	"flag"
 	"fmt"
-	"github.com/pkg/errors"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -15,6 +14,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/blang/semver"
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
@@ -670,7 +671,7 @@ var _ = Describe("backup and restore end to end tests", func() {
 				"public.good_table1":   10,
 				"public.good_table2":   10})
 		})
-		It(`Creates skip file on segments for corrupted table for helpers to discover the file and skip it with --single-data-file and --on-error-continue`, func(){
+		It(`Creates skip file on segments for corrupted table for helpers to discover the file and skip it with --single-data-file and --on-error-continue`, func() {
 			if useOldBackupVersion {
 				Skip("This test is not needed for old backup versions")
 			} else if restoreConn.Version.Before("6") {
@@ -951,11 +952,11 @@ var _ = Describe("backup and restore end to end tests", func() {
 				"--redirect-schema", "schema3")
 
 			expectedSchema3TupleCounts := map[string]int{
-				"schema3.returns": 6,
-				"schema3.foo2":    0,
-				"schema3.foo3":    100,
-				"schema3.ao1":     1000,
-				"schema3.ao2":     1000,
+				"schema3.returns":          6,
+				"schema3.foo2":             0,
+				"schema3.foo3":             100,
+				"schema3.ao1":              1000,
+				"schema3.ao2":              1000,
 				"schema3.redirected_table": 0,
 			}
 			assertDataRestored(restoreConn, expectedSchema3TupleCounts)

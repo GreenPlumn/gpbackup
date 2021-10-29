@@ -27,15 +27,13 @@ import (
  */
 
 var (
-	CleanupGroup  *sync.WaitGroup
-	currentPipe   string
-	errBuf        bytes.Buffer
-	lastPipe      string
-	nextPipe      string
-	version       string
-	wasTerminated bool
-	writeHandle   *os.File
-	writer        *bufio.Writer
+	CleanupGroup    *sync.WaitGroup
+	errBuf          bytes.Buffer
+	version         string
+	wasTerminated   bool
+	writeHandle     *os.File
+	writer          *bufio.Writer
+	createdPipesMap map[string]bool
 )
 
 /*
@@ -125,6 +123,8 @@ func InitializeGlobals() {
 		os.Exit(0)
 	}
 	operating.InitializeSystemFunctions()
+
+	createdPipesMap = make(map[string]bool, 0)
 }
 
 /*
@@ -133,7 +133,30 @@ func InitializeGlobals() {
 
 func createPipe(pipe string) error {
 	err := unix.Mkfifo(pipe, 0777)
-	return err
+	if err != nil {
+		return err
+	}
+
+	createdPipesMap[pipe] = true
+	return nil
+}
+
+func deletePipe(pipe string) error {
+	err := utils.RemoveFileIfExists(pipe)
+	if err != nil {
+		return err
+	}
+
+	delete(createdPipesMap, pipe)
+	return nil
+}
+
+// Gpbackup creates the first n pipes. Record these pipes.
+func preloadCreatedPipes(oidList []int, prefetchedPipeCount int) {
+	for i := 0; i < prefetchedPipeCount; i++ {
+		pipeName := fmt.Sprintf("%s_%d", *pipeFile, oidList[i])
+		createdPipesMap[pipeName] = true
+	}
 }
 
 func getOidListFromFile() ([]int, error) {
@@ -188,17 +211,26 @@ func DoCleanup() {
 	if err != nil {
 		log("Encountered error during cleanup: %v", err)
 	}
-	err = utils.RemoveFileIfExists(lastPipe)
-	if err != nil {
-		log("Encountered error during cleanup: %v", err)
-	}
-	err = utils.RemoveFileIfExists(currentPipe)
-	if err != nil {
-		log("Encountered error during cleanup: %v", err)
-	}
-	err = utils.RemoveFileIfExists(nextPipe)
-	if err != nil {
-		log("Encountered error during cleanup: %v", err)
+	// err = utils.RemoveFileIfExists(lastPipe)
+	// if err != nil {
+	// 	log("Encountered error during cleanup: %v", err)
+	// }
+	// err = utils.RemoveFileIfExists(currentPipe)
+	// if err != nil {
+	// 	log("Encountered error during cleanup: %v", err)
+	// }
+	// err = utils.RemoveFileIfExists(nextPipe)
+	// if err != nil {
+	// 	log("Encountered error during cleanup: %v", err)
+	// }
+
+	for pipeName, _ := range createdPipesMap {
+		err = deletePipe(pipeName)
+		if err != nil {
+			log("Encountered error removing pipe %s: %v", pipeName, err)
+		} else {
+			log("Removing pipe %s", pipeName)
+		}
 	}
 
 	skipFiles, _ := filepath.Glob(fmt.Sprintf("%s_skip_*", *pipeFile))

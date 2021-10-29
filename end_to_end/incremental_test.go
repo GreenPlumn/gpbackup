@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"time"
 
 	"github.com/greenplum-db/gp-common-go-libs/dbconn"
 	"github.com/greenplum-db/gp-common-go-libs/testhelper"
@@ -322,7 +323,7 @@ var _ = Describe("End to End incremental tests", func() {
 				pluginExecutablePath := fmt.Sprintf("%s/src/github.com/greenplum-db/gpbackup/plugins/example_plugin.bash", os.Getenv("GOPATH"))
 				copyPluginToAllHosts(backupConn, pluginExecutablePath)
 			})
-			It("Restores from an incremental backup based on a from-timestamp incremental", func() {
+			FIt("Restores from an incremental backup based on a from-timestamp incremental", func() {
 				fullBackupTimestamp := gpbackup(gpbackupPath, backupHelperPath,
 					"--leaf-partition-data",
 					"--single-data-file",
@@ -350,6 +351,8 @@ var _ = Describe("End to End incremental tests", func() {
 					"--single-data-file",
 					"--plugin-config", pluginConfigPath)
 				forceMetadataFileDownloadFromPlugin(backupConn, incremental2Timestamp)
+
+				time.Sleep(5 * time.Minute)
 
 				gprestore(gprestorePath, restoreHelperPath, incremental2Timestamp,
 					"--redirect-db", "restoredb",
