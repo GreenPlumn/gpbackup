@@ -238,7 +238,7 @@ func ValidateBackupFlagCombinations(flags *pflag.FlagSet) {
 		gplog.Fatal(errors.Errorf("Cannot use metadata-only flag when restoring data-only backup"), "")
 	}
 	if !backupConfig.SingleDataFile && flags.Changed(options.SINGLE_DATA_FILE_COPY_PREFETCH) {
-		gplog.Fatal(errors.Errorf("The --single-data-file-copy-prefetch flag cannot be used when the backup was taken without --single-data-file"), "")
+		gplog.Fatal(errors.Errorf("The --single-data-file-copy-prefetch flag can only be used if the backup was taken with --single-data-file"), "")
 	}
 	validateBackupFlagPluginCombinations()
 }

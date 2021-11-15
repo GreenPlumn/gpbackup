@@ -19,6 +19,15 @@ import (
  * used in testing.
  */
 
+ /*
+ Table backup state constants
+ */
+ const (
+	Unknown int = iota
+	Deferred
+	Complete
+)
+
 /*
  * Non-flag variables
  */

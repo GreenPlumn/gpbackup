@@ -128,9 +128,6 @@ func validateFlagValues() {
 		gplog.Fatal(errors.Errorf("--single-data-file-copy-prefetch %d is invalid. Must be at least 1",
 			MustGetFlagInt(options.SINGLE_DATA_FILE_COPY_PREFETCH)), "")
 	}
-	if MustGetFlagInt(options.SINGLE_DATA_FILE_COPY_PREFETCH) > 4 {
-		gplog.Warn("Recommend a max value of 4 for --single-data-file-copy-prefetch")
-	}
 }
 
 func validateFromTimestamp(fromTimestamp string) {

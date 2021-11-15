@@ -110,41 +110,7 @@ func BackupSingleTableData(table Table, rowsCopiedMap map[uint32]int64, counters
 	return nil
 }
 
-const (
-	Unknown int = iota
-	Deferred
-	Complete
-)
 
-type safeOIDMap struct {
-	mutex  *sync.RWMutex
-	oidMap map[uint32]int
-}
-
-func (s *safeOIDMap) Init(tables []Table) {
-	s.mutex = &sync.RWMutex{}
-	s.oidMap = make(map[uint32]int, len(tables))
-	for _, table := range tables {
-		s.oidMap[table.Oid] = Unknown
-	}
-}
-func (s *safeOIDMap) SafeSet(key uint32, value int) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	s.oidMap[key] = value
-}
-
-func (s *safeOIDMap) SafeGet(key uint32) int {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-	return s.oidMap[key]
-}
-
-func (s *safeOIDMap) List() map[uint32]int {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-	return s.oidMap
-}
 
 func backupDataForAllTablesPrefetch(tables []Table) []map[uint32]int64 {
 	var numExtOrForeignTables int64
@@ -164,8 +130,7 @@ func backupDataForAllTablesPrefetch(tables []Table) []map[uint32]int64 {
 	 */
 	tasks := make(chan Table, len(tables))
 	// Record hashmap of oids to track which have been processed
-	var oidMap safeOIDMap
-	oidMap.Init(tables)
+	var oidMap sync.Map
 	var workerPool sync.WaitGroup
 	var copyErr error
 	// Loading the tables as tasks. Start goroutines that work on the tasks
@@ -187,7 +152,7 @@ func backupDataForAllTablesPrefetch(tables []Table) []map[uint32]int64 {
 
 				if table.SkipDataBackup() {
 					gplog.Verbose("Skipping data backup of table %s because it is either an external or foreign table.", table.FQN())
-					oidMap.SafeSet(table.Oid, Complete)
+					oidMap.Store(table.Oid, Complete)
 					continue
 				}
 				// If a random external SQL command had queued an AccessExclusiveLock acquisition request
@@ -198,7 +163,6 @@ func backupDataForAllTablesPrefetch(tables []Table) []map[uint32]int64 {
 				// Afterwards, we break early and terminate the worker since its transaction is now in an
 				// aborted state. We do not need to do this with the main worker thread because it has
 				// already acquired AccessShareLocks on all tables before the metadata dumping part.
-
 				err := LockTableNoWait(table, whichConn)
 				if err != nil {
 					// Postgres Error Code 55P03 translates to LOCK_NOT_AVAILABLE
@@ -215,7 +179,7 @@ func backupDataForAllTablesPrefetch(tables []Table) []map[uint32]int64 {
 					gplog.Warn("Worker %d could not acquire AccessShareLock for table %s. Terminating worker and deferring table to main worker thread.",
 						whichConn, table.FQN())
 
-					oidMap.SafeSet(table.Oid, Deferred)
+					oidMap.Store(table.Oid, Deferred)
 
 					// Rollback transaction since it's in an aborted state
 					connectionPool.MustRollback(whichConn)
@@ -228,7 +192,7 @@ func backupDataForAllTablesPrefetch(tables []Table) []map[uint32]int64 {
 				if err != nil {
 					copyErr = err
 				}
-				oidMap.SafeSet(table.Oid, Complete)
+				oidMap.Store(table.Oid, Complete)
 
 			}
 		}(connNum)
@@ -241,21 +205,19 @@ func backupDataForAllTablesPrefetch(tables []Table) []map[uint32]int64 {
 	deferredWorkerDone := make(chan bool)
 	go func() {
 		for _, table := range tables {
-			for {
-				switch oidMap.SafeGet(table.Oid) {
-				case Unknown:
-					time.Sleep(time.Millisecond * 50)
-				case Deferred:
-					err := BackupSingleTableData(table, rowsCopiedMaps[0], &counters, 0)
-					if err != nil {
-						copyErr = err
-					}
-					oidMap.SafeSet(table.Oid, Complete)
+			var state interface{}
+			var ok bool = false
+			for !ok {
+				state, ok = oidMap.Load(table.Oid)
+			}
+			if state.(int) == Unknown {
+				time.Sleep(time.Millisecond * 50)
+			} else if state.(int) == Deferred {
+				err := BackupSingleTableData(table, rowsCopiedMaps[0], &counters, 0)
+				if err != nil {
+					copyErr = err
 				}
-
-				if oidMap.SafeGet(table.Oid) == Complete {
-					break
-				}
+				oidMap.Store(table.Oid, Complete)
 			}
 		}
 		deferredWorkerDone <- true
@@ -264,16 +226,14 @@ func backupDataForAllTablesPrefetch(tables []Table) []map[uint32]int64 {
 	close(tasks)
 	workerPool.Wait()
 
-	allWorkersTerminatedLogged := false
-	for oid := range oidMap.List() {
-		if oidMap.SafeGet(oid) == Unknown {
-			if !allWorkersTerminatedLogged {
-				gplog.Warn("All prefetch workers terminated due to lock issues. Falling back to single main worker.")
-				allWorkersTerminatedLogged = true
-			}
-			oidMap.SafeSet(oid, Deferred) // All deferred tables are processed by worker 0
+	oidMap.Range(func(key, value interface{}) bool {
+		if value == Unknown {
+			gplog.Warn("All prefetch workers terminated due to lock issues. Falling back to single main worker.")
+			return false
 		}
-	}
+		return true
+		},
+	)
 	<-deferredWorkerDone
 
 	var agentErr error
