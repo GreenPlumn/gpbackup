@@ -1646,6 +1646,7 @@ var _ = Describe("backup and restore end to end tests", func() {
 
 		// Sanity check that 9 deadlock traps were placed during the test
 		Expect(accessExclBlockedLockCount).To(Equal(9))
+		Expect(stdout).To(ContainSubstring("[WARNING]: All prefetch workers terminated due to lock issues. Falling back to single main worker."))
 
 		// No non-main worker should have been able to run COPY due to deadlock detection
 		for i := 1; i < 9; i++ {

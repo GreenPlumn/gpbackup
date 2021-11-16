@@ -86,13 +86,14 @@ func CopyTableOut(connectionPool *dbconn.DBConn, table Table, destinationToWrite
 }
 
 func BackupSingleTableData(table Table, rowsCopiedMap map[uint32]int64, counters *BackupProgressCounters, whichConn int) error {
-	atomic.AddInt64(&counters.NumRegTables, 1)
-	numTables := counters.NumRegTables //We save this so it won't be modified before we log it
+	logMessage := fmt.Sprintf("Writing data for table %s to file", table.FQN())
+	// Avoid race condition by incrementing counters in call to sprintf
+	tableCount := fmt.Sprintf(" (table %d of %d)", atomic.AddInt64(&counters.NumRegTables, 1), counters.TotalRegTables)
 	if gplog.GetVerbosity() > gplog.LOGINFO {
 		// No progress bar at this log level, so we note table count here
-		gplog.Verbose("Writing data for table %s to file (table %d of %d)", table.FQN(), numTables, counters.TotalRegTables)
+		gplog.Verbose(logMessage + tableCount)
 	} else {
-		gplog.Verbose("Writing data for table %s to file", table.FQN())
+		gplog.Verbose(logMessage)
 	}
 
 	destinationToWrite := ""
@@ -165,8 +166,7 @@ func backupDataForAllTablesPrefetch(tables []Table) []map[uint32]int64 {
 				// already acquired AccessShareLocks on all tables before the metadata dumping part.
 				err := LockTableNoWait(table, whichConn)
 				if err != nil {
-					// Postgres Error Code 55P03 translates to LOCK_NOT_AVAILABLE
-					if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code != "55P03" {
+					if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code != PG_LOCK_NOT_AVAILABLE {
 						copyErr = err
 						continue
 					}
@@ -226,14 +226,20 @@ func backupDataForAllTablesPrefetch(tables []Table) []map[uint32]int64 {
 	close(tasks)
 	workerPool.Wait()
 
-	oidMap.Range(func(key, value interface{}) bool {
-		if value == Unknown {
-			gplog.Warn("All prefetch workers terminated due to lock issues. Falling back to single main worker.")
-			return false
+	allWorkersTerminatedLogged := false
+	oidMap.Range(func(oid, state interface{}) bool {
+		if state.(int) == Unknown {
+			if !allWorkersTerminatedLogged {
+				gplog.Warn("All prefetch workers terminated due to lock issues. Falling back to single main worker.")
+				allWorkersTerminatedLogged = true
+			}
+			state = Deferred
 		}
-		return true
+		return true // return true to continue iterating over oidMap
 		},
 	)
+
+	// Main goroutine waits for deferred worker 0 by waiting on this channel
 	<-deferredWorkerDone
 
 	var agentErr error
@@ -302,8 +308,7 @@ func backupDataForAllTables(tables []Table) []map[uint32]int64 {
 				if whichConn != 0 {
 					err := LockTableNoWait(table, whichConn)
 					if err != nil {
-						// Postgres Error Code 55P03 translates to LOCK_NOT_AVAILABLE
-						if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code != "55P03" {
+						if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code != PG_LOCK_NOT_AVAILABLE {
 							copyErr = err
 							continue
 						}

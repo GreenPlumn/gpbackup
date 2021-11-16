@@ -26,6 +26,7 @@ import (
 	Unknown int = iota
 	Deferred
 	Complete
+	PG_LOCK_NOT_AVAILABLE = "55P03"
 )
 
 /*

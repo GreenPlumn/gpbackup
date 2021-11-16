@@ -41,14 +41,29 @@ do
   psql -d copyprefetchdb -q -c "INSERT INTO tbl_1k_\$j SELECT generate_series(1,1000)"
 done
 
-
-echo "## Performing single-data-file, --no-compression, --single-data-file-copy-prefetch 4 backup for copy prefetch test ##"
-time gpbackup --dbname copyprefetchdb --backup-dir /data/gpdata/ --single-data-file --no-compression --single-data-file-copy-prefetch=4 | tee "\$log_file"
+echo "## Performing single-data-file, --no-compression, --single-data-file-copy-prefetch 1 backup for copy prefetch test ##"
+time gpbackup --dbname copyprefetchdb --backup-dir /data/gpdata/ --single-data-file --no-compression --single-data-file-copy-prefetch 1 | tee "\$log_file"
 timestamp=\$(head -10 "\$log_file" | grep "Backup Timestamp " | grep -Eo "[[:digit:]]{14}")
 gpbackup_manager display-report \$timestamp
 
+echo "## Performing single-data-file, --no-compression, --single-data-file-copy-prefetch 4 backup for copy prefetch test ##"
+time gpbackup --dbname copyprefetchdb --backup-dir /data/gpdata/ --single-data-file --no-compression --single-data-file-copy-prefetch 4 | tee "\$log_file"
+timestamp=\$(head -10 "\$log_file" | grep "Backup Timestamp " | grep -Eo "[[:digit:]]{14}")
+gpbackup_manager display-report \$timestamp
+
+echo "## Performing single-data-file, --no-compression, --single-data-file-copy-prefetch 8 backup for copy prefetch test ##"
+time gpbackup --dbname copyprefetchdb --backup-dir /data/gpdata/ --single-data-file --no-compression --single-data-file-copy-prefetch 8 | tee "\$log_file"
+timestamp=\$(head -10 "\$log_file" | grep "Backup Timestamp " | grep -Eo "[[:digit:]]{14}")
+gpbackup_manager display-report \$timestamp
+
+echo "## Performing single-data-file, --no-compression, --single-data-file-copy-prefetch 1 restore for copy prefetch test ##"
+time gprestore --timestamp "\$timestamp" --backup-dir /data/gpdata/ --create-db --redirect-db copyprefetchrestore1 --single-data-file-copy-prefetch 1
+
 echo "## Performing single-data-file, --no-compression, --single-data-file-copy-prefetch 4 restore for copy prefetch test ##"
-time gprestore --timestamp "\$timestamp" --backup-dir /data/gpdata/ --create-db --redirect-db copyprefetchrestore --single-data-file-copy-prefetch 4
+time gprestore --timestamp "\$timestamp" --backup-dir /data/gpdata/ --create-db --redirect-db copyprefetchrestore4 --single-data-file-copy-prefetch 4
+
+echo "## Performing single-data-file, --no-compression, --single-data-file-copy-prefetch 8 restore for copy prefetch test ##"
+time gprestore --timestamp "\$timestamp" --backup-dir /data/gpdata/ --create-db --redirect-db copyprefetchrestore8 --single-data-file-copy-prefetch 8
 
 echo "## Populating database for data scale test ##"
 createdb datascaledb
